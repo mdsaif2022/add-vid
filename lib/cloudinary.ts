@@ -20,8 +20,9 @@ export async function getRandomVideo(): Promise<CloudinaryVideo | null> {
   const resources: any[] = res.resources || [];
   if (!resources.length) return null;
 
-  const randomIndex = Math.floor(Math.random() * resources.length);
-  const chosen = resources[randomIndex];
+  // Shuffle the array to ensure better randomization
+  const shuffled = [...resources].sort(() => Math.random() - 0.5);
+  const chosen = shuffled[0];
 
   const playback_url = cloudinary.url(chosen.public_id, {
     resource_type: chosen.resource_type,
