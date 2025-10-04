@@ -5,6 +5,14 @@ cloudinary.config({ secure: true });
 
 export async function POST(request: NextRequest) {
   try {
+    // Check if Cloudinary is configured
+    if (!process.env.CLOUDINARY_URL) {
+      console.error('CLOUDINARY_URL environment variable is not set');
+      return NextResponse.json({ 
+        error: 'Cloudinary not configured. Please set CLOUDINARY_URL environment variable.' 
+      }, { status: 500 });
+    }
+
     const formData = await request.formData();
     const file = formData.get('media') as File;
     const caption = (formData.get('caption') as string) || '';
@@ -26,7 +34,7 @@ export async function POST(request: NextRequest) {
     const maxImageSize = 10 * 1024 * 1024;
     const maxSize = isVideo ? maxVideoSize : maxImageSize;
     if (file.size > maxSize) {
-      return NextResponse.json({ error: `File too large` }, { status: 400 });
+      return NextResponse.json({ error: `File too large. Max size: ${isVideo ? '100MB' : '10MB'}` }, { status: 400 });
     }
 
     // Upload with context metadata
@@ -45,14 +53,26 @@ export async function POST(request: NextRequest) {
           },
         },
         (error, result) => {
-          if (error) reject(error);
-          else resolve(result);
+          if (error) {
+            console.error('Cloudinary upload error:', error);
+            reject(error);
+          } else {
+            resolve(result);
+          }
         }
       ).end(buffer);
     });
 
-    return NextResponse.json({ success: true, url: (result as any).secure_url, mediaType: isVideo ? 'video' : 'image' });
+    return NextResponse.json({ 
+      success: true, 
+      url: (result as any).secure_url, 
+      mediaType: isVideo ? 'video' : 'image' 
+    });
   } catch (error) {
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    console.error('Upload error:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Upload failed';
+    return NextResponse.json({ 
+      error: `Upload failed: ${errorMessage}` 
+    }, { status: 500 });
   }
 }
