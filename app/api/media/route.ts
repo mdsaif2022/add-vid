@@ -45,8 +45,8 @@ export async function GET() {
       public_id: r.public_id,
       type: r.resource_type,
       url: r.secure_url,
-      caption: r.context?.custom?.caption || '',
-      description: r.context?.custom?.description || '',
+      caption: r.context?.caption || r.context?.custom?.caption || '',
+      description: r.context?.description || r.context?.custom?.description || '',
       created_at: r.created_at,
     }));
 

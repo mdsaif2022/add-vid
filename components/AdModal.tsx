@@ -11,6 +11,7 @@ export default function AdModal({ onFinished, minViewMs = 2000, maxWaitMs = 1000
   const [phase, setPhase] = useState<'loading' | 'showing' | 'done'>('loading');
   const containerRef = useRef<HTMLDivElement | null>(null);
   const ranRef = useRef(false);
+  const mountedRef = useRef(true);
 
   useEffect(() => {
     if (ranRef.current) return; // prevent double-run in React StrictMode
@@ -21,7 +22,7 @@ export default function AdModal({ onFinished, minViewMs = 2000, maxWaitMs = 1000
 
     let finished = false;
     const finish = () => {
-      if (finished) return;
+      if (finished || !mountedRef.current) return;
       finished = true;
       setPhase('done');
       onFinished();
@@ -60,7 +61,7 @@ export default function AdModal({ onFinished, minViewMs = 2000, maxWaitMs = 1000
 
     // 2) Fallback to iframe after a short grace if not loaded yet
     const iframeFallbackTimer = setTimeout(() => {
-      if (!finished && phase === 'loading') {
+      if (!finished) {
         tryIframe();
       }
     }, 1500);
@@ -93,10 +94,18 @@ export default function AdModal({ onFinished, minViewMs = 2000, maxWaitMs = 1000
     }
 
     return () => {
+      mountedRef.current = false;
       clearTimeout(hardTimeout);
       clearTimeout(iframeFallbackTimer);
     };
-  }, [onFinished, minViewMs, maxWaitMs, phase]);
+  }, [onFinished, minViewMs, maxWaitMs]);
+
+  // Reset the component when it mounts
+  useEffect(() => {
+    mountedRef.current = true;
+    ranRef.current = false;
+    setPhase('loading');
+  }, []);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black">
