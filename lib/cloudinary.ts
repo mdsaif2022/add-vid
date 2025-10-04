@@ -13,7 +13,7 @@ export type CloudinaryVideo = {
 
 export async function getRandomVideo(): Promise<CloudinaryVideo | null> {
   const res = await cloudinary.search
-    .expression('resource_type:video')
+    .expression('resource_type:(video OR image)')
     .max_results(100)
     .execute();
 
@@ -24,7 +24,7 @@ export async function getRandomVideo(): Promise<CloudinaryVideo | null> {
   const chosen = resources[randomIndex];
 
   const playback_url = cloudinary.url(chosen.public_id, {
-    resource_type: 'video',
+    resource_type: chosen.resource_type,
     type: 'upload',
     secure: true,
   });

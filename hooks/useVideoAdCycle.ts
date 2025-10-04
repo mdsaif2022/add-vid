@@ -18,9 +18,20 @@ export function useVideoAdCycle() {
   const suppressHistoryPushRef = useRef<boolean>(false);
 
   const fetchRandomVideo = useCallback(async (): Promise<Video | null> => {
-    const res = await fetch('/api/videos', { cache: 'no-store' });
-    if (!res.ok) return null;
-    return (await res.json()) as Video;
+    try {
+      console.log('Fetching random video...');
+      const res = await fetch('/api/videos', { cache: 'no-store' });
+      if (!res.ok) {
+        console.error('Video fetch failed:', res.status, res.statusText);
+        return null;
+      }
+      const video = await res.json();
+      console.log('Video fetched successfully:', video.url);
+      return video;
+    } catch (error) {
+      console.error('Video fetch error:', error);
+      return null;
+    }
   }, []);
 
   const setVideoPhase = useCallback((src: string, count: number, pushToHistory: boolean) => {
@@ -57,19 +68,24 @@ export function useVideoAdCycle() {
   }, []);
 
   const handleVideoEnd = useCallback(() => {
+    console.log('Video ended, current sequence:', sequenceRef.current);
     // After single video → ad; after two videos → ad
     if (sequenceRef.current.videosAfterAd === 1) {
       // Next phase: ad, then set to two videos
+      console.log('Single video finished, showing ad');
       sequenceRef.current = { nextIsSingle: false, videosAfterAd: 2 };
       showAd();
     } else {
       // We are in two-video phase; decrement until 0 then ad
       const remaining = sequenceRef.current.videosAfterAd - 1;
+      console.log('Videos remaining in sequence:', remaining);
       if (remaining <= 0) {
+        console.log('Two videos finished, showing ad');
         sequenceRef.current = { nextIsSingle: false, videosAfterAd: 2 };
         showAd();
       } else {
         sequenceRef.current.videosAfterAd = remaining;
+        console.log('Playing next video in sequence');
         // Continue to next video immediately
         playNextVideo();
       }
