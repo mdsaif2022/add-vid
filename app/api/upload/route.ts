@@ -3,9 +3,12 @@ import { v2 as cloudinary } from 'cloudinary';
 
 // Configure Cloudinary with environment variable
 if (process.env.CLOUDINARY_URL) {
+  console.log('Configuring Cloudinary with URL:', process.env.CLOUDINARY_URL);
   cloudinary.config({
     secure: true,
   });
+} else {
+  console.log('CLOUDINARY_URL not found in environment variables');
 }
 
 export async function POST(request: NextRequest) {
@@ -69,8 +72,10 @@ export async function POST(request: NextRequest) {
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
-    const result = await new Promise((resolve, reject) => {
-      cloudinary.uploader.upload_stream(
+    // Try direct upload first
+    try {
+      const result = await cloudinary.uploader.upload(
+        `data:${file.type};base64,${buffer.toString('base64')}`,
         {
           resource_type: isVideo ? 'video' : 'image',
           folder: isVideo ? 'video-streaming' : 'image-gallery',
@@ -79,25 +84,51 @@ export async function POST(request: NextRequest) {
             caption,
             description,
           },
-        },
-        (error, result) => {
-          if (error) {
-            console.error('Cloudinary upload error:', error);
-            console.error('Error details:', JSON.stringify(error, null, 2));
-            reject(error);
-          } else {
-            console.log('Cloudinary upload successful:', result?.public_id);
-            resolve(result);
-          }
         }
-      ).end(buffer);
-    });
+      );
+      
+      console.log('Cloudinary upload successful:', result.public_id);
+      return NextResponse.json({ 
+        success: true, 
+        url: result.secure_url, 
+        mediaType: isVideo ? 'video' : 'image',
+        publicId: result.public_id
+      });
+    } catch (uploadError) {
+      console.error('Direct upload failed, trying stream upload...', uploadError);
+      
+      // Fallback to stream upload
+      const result = await new Promise((resolve, reject) => {
+        cloudinary.uploader.upload_stream(
+          {
+            resource_type: isVideo ? 'video' : 'image',
+            folder: isVideo ? 'video-streaming' : 'image-gallery',
+            public_id: `${isVideo ? 'video' : 'image'}_${Date.now()}`,
+            context: {
+              caption,
+              description,
+            },
+          },
+          (error, result) => {
+            if (error) {
+              console.error('Cloudinary upload error:', error);
+              console.error('Error details:', JSON.stringify(error, null, 2));
+              reject(error);
+            } else {
+              console.log('Cloudinary upload successful:', result?.public_id);
+              resolve(result);
+            }
+          }
+        ).end(buffer);
+      });
 
-    return NextResponse.json({ 
-      success: true, 
-      url: (result as any).secure_url, 
-      mediaType: isVideo ? 'video' : 'image' 
-    });
+      return NextResponse.json({ 
+        success: true, 
+        url: (result as any).secure_url, 
+        mediaType: isVideo ? 'video' : 'image',
+        publicId: (result as any).public_id
+      });
+    }
   } catch (error) {
     console.error('Upload error:', error);
     const errorMessage = error instanceof Error ? error.message : 'Upload failed';
