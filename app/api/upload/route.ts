@@ -1,10 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { v2 as cloudinary } from 'cloudinary';
 
-cloudinary.config({ secure: true });
+// Configure Cloudinary with environment variable
+if (process.env.CLOUDINARY_URL) {
+  cloudinary.config({
+    secure: true,
+  });
+}
 
 export async function POST(request: NextRequest) {
   try {
+    console.log('Upload API called');
+    console.log('CLOUDINARY_URL exists:', !!process.env.CLOUDINARY_URL);
+    
     // Check if Cloudinary is configured
     if (!process.env.CLOUDINARY_URL) {
       console.error('CLOUDINARY_URL environment variable is not set');
@@ -52,6 +60,12 @@ export async function POST(request: NextRequest) {
     }
 
     // Upload with context metadata
+    console.log('Starting Cloudinary upload...');
+    console.log('File type:', file.type);
+    console.log('File size:', file.size);
+    console.log('Caption:', caption);
+    console.log('Description:', description);
+    
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
@@ -69,8 +83,10 @@ export async function POST(request: NextRequest) {
         (error, result) => {
           if (error) {
             console.error('Cloudinary upload error:', error);
+            console.error('Error details:', JSON.stringify(error, null, 2));
             reject(error);
           } else {
+            console.log('Cloudinary upload successful:', result?.public_id);
             resolve(result);
           }
         }
