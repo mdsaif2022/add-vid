@@ -130,7 +130,14 @@ export default function VideoPlayer({ src, onEnded, autoPlay = true, onPrev, onN
   }, [src]);
 
   useEffect(() => {
-    if (isImage) return; // no autoplay for images
+    if (isImage) {
+      // For images, trigger onEnded after a short delay to simulate "playing"
+      const timer = setTimeout(() => {
+        if (onEnded) onEnded();
+      }, 3000); // Show image for 3 seconds then move to next
+      return () => clearTimeout(timer);
+    }
+    
     const video = videoRef.current;
     if (!video) return;
     const onCanPlay = () => {
@@ -153,7 +160,7 @@ export default function VideoPlayer({ src, onEnded, autoPlay = true, onPrev, onN
       video.removeEventListener('play', onPlay);
       video.removeEventListener('pause', onPause);
     };
-  }, [src, autoPlay, userPaused, isImage]);
+  }, [src, autoPlay, userPaused, isImage, onEnded]);
 
   const download = useCallback(() => {
     const a = document.createElement('a');

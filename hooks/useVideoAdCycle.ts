@@ -40,12 +40,15 @@ export function useVideoAdCycle() {
   }, []);
 
   const playNextVideo = useCallback(async () => {
+    console.log('playNextVideo called');
     const data = await fetchRandomVideo();
     if (!data) {
+      console.log('No video data, setting loading phase');
       setPhase({ type: 'loading' });
       return;
     }
     const count = sequenceRef.current.videosAfterAd;
+    console.log('Setting video phase with count:', count);
     setVideoPhase(data.url, count, true);
   }, [fetchRandomVideo, setVideoPhase]);
 
@@ -93,6 +96,7 @@ export function useVideoAdCycle() {
   }, [playNextVideo, showAd]);
 
   const handleAdFinished = useCallback(() => {
+    console.log('Ad finished, starting next video block');
     // After any ad, we should play the next block of 2 videos
     sequenceRef.current = { nextIsSingle: false, videosAfterAd: 2 };
     playNextVideo();
