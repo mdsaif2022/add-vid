@@ -50,8 +50,10 @@ export default function AdModal({ onFinished, minViewMs = 2000, maxWaitMs = 1000
     inlineScript.addEventListener('load', handleLoaded);
     inlineScript.addEventListener('error', handleError);
 
-    container.innerHTML = '';
-    container.appendChild(inlineScript);
+    if (container) {
+      container.innerHTML = '';
+      container.appendChild(inlineScript);
+    }
 
     // Hard timeout if nothing worked
     const hardTimeout = setTimeout(() => finish(), maxWaitMs);
@@ -64,23 +66,22 @@ export default function AdModal({ onFinished, minViewMs = 2000, maxWaitMs = 1000
     }, 1500);
 
     function tryIframe() {
-      if (finished) return;
+      const host = containerRef.current;
+      if (finished || !host) return;
       setPhase('loading');
-      container.innerHTML = '';
+      host.innerHTML = '';
       const frame = document.createElement('iframe');
       frame.title = 'ad';
       frame.style.border = '0';
       frame.style.width = '100%';
       frame.style.height = '100%';
       frame.referrerPolicy = 'no-referrer-when-downgrade';
-      container.appendChild(frame);
+      host.appendChild(frame);
       try {
         const doc = frame.contentDocument || frame.contentWindow?.document;
         if (!doc) return;
         doc.open();
-        doc.write(`<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"/></head><body style="margin:0;padding:0;overflow:hidden;background:#000;">
-          <script type="text/javascript" src="https://pl27290084.profitableratecpm.com/d0/41/1a/d0411aa965c9eae2ef7ce1a2dc760583.js"><\/script>
-        </body></html>`);
+        doc.write(`<!doctype html><html><head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"/></head><body style=\"margin:0;padding:0;overflow:hidden;background:#000;\">\n          <script type=\"text/javascript\" src=\"https://pl27290084.profitableratecpm.com/d0/41/1a/d0411aa965c9eae2ef7ce1a2dc760583.js\"><\\/script>\n        </body></html>`);
         doc.close();
         setPhase('showing');
         const elapsed = Date.now() - startTs;
