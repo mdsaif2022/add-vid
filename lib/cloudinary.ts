@@ -20,13 +20,8 @@ export async function getRandomVideo(): Promise<CloudinaryVideo | null> {
   const resources: any[] = res.resources || [];
   if (!resources.length) return null;
 
-  // Use crypto.randomInt for true randomization (if available) or fallback to Math.random
-  let randomIndex: number;
-  if (typeof crypto !== 'undefined' && crypto.randomInt) {
-    randomIndex = crypto.randomInt(0, resources.length);
-  } else {
-    randomIndex = Math.floor(Math.random() * resources.length);
-  }
+  // Use Math.random for randomization (compatible with all environments)
+  const randomIndex = Math.floor(Math.random() * resources.length);
   
   const chosen = resources[randomIndex];
 
