@@ -1,5 +1,6 @@
 "use client";
 import React, { useEffect, useRef, useState } from 'react';
+import { AD_CONFIG, AD_SETTINGS } from '@/lib/adConfig';
 
 type Props = {
   onFinished: () => void;
@@ -7,16 +8,32 @@ type Props = {
   maxWaitMs?: number;
 };
 
-export default function AdModal({ onFinished, minViewMs = 3000, maxWaitMs = 15000 }: Props) {
+// Build ad networks array from configuration
+const AD_NETWORKS = Object.entries(AD_CONFIG)
+  .filter(([_, config]) => config.enabled)
+  .sort(([_, a], [__, b]) => a.priority - b.priority)
+  .map(([name, config]) => ({
+    name: name.charAt(0).toUpperCase() + name.slice(1),
+    script: config.script,
+    method: name.includes('iframe') ? 'iframe' : 'script'
+  }));
+
+export default function AdModal({ 
+  onFinished, 
+  minViewMs = AD_SETTINGS.minViewTime, 
+  maxWaitMs = AD_SETTINGS.maxWaitTime 
+}: Props) {
   const [phase, setPhase] = useState<'loading' | 'showing' | 'done'>('loading');
-  const [adMethod, setAdMethod] = useState<'script' | 'iframe' | 'fallback'>('script');
+  const [currentAd, setCurrentAd] = useState<string>('');
+  const [adMethod, setAdMethod] = useState<string>('');
   const containerRef = useRef<HTMLDivElement | null>(null);
   const ranRef = useRef(false);
   const mountedRef = useRef(true);
   const adLoadedRef = useRef(false);
+  const currentAdIndex = useRef(0);
 
   useEffect(() => {
-    if (ranRef.current) return; // prevent double-run in React StrictMode
+    if (ranRef.current) return;
     ranRef.current = true;
 
     const container = containerRef.current;
@@ -27,24 +44,41 @@ export default function AdModal({ onFinished, minViewMs = 3000, maxWaitMs = 1500
       if (finished || !mountedRef.current) return;
       finished = true;
       setPhase('done');
-      setTimeout(() => onFinished(), 100); // Small delay to ensure state updates
+      setTimeout(() => onFinished(), 100);
     };
 
     const startTs = Date.now();
 
-    // Method 1: Try direct script injection
-    const tryScriptMethod = () => {
-      console.log('Adsterra: Trying script method...');
-      setAdMethod('script');
+    const tryAdNetwork = (adIndex: number) => {
+      if (finished || adIndex >= AD_NETWORKS.length) {
+        console.log('Adsterra: All ad networks failed, showing fallback');
+        showFallbackAd();
+        return;
+      }
+
+      const ad = AD_NETWORKS[adIndex];
+      currentAdIndex.current = adIndex;
+      setCurrentAd(ad.name);
+      setAdMethod(ad.method);
       
+      console.log(`Adsterra: Trying ${ad.name} (${ad.method})`);
+
+      if (ad.method === 'script') {
+        tryScriptMethod(ad);
+      } else if (ad.method === 'iframe') {
+        tryIframeMethod(ad);
+      }
+    };
+
+    const tryScriptMethod = (ad: typeof AD_NETWORKS[0]) => {
       const script = document.createElement('script');
       script.type = 'text/javascript';
-      script.src = 'https://pl27290084.profitableratecpm.com/d0/41/1a/d0411aa965c9eae2ef7ce1a2dc760583.js';
+      script.src = ad.script;
       script.async = true;
       script.defer = true;
 
       const handleLoaded = () => {
-        console.log('Adsterra: Script loaded successfully');
+        console.log(`Adsterra: ${ad.name} script loaded successfully`);
         adLoadedRef.current = true;
         setPhase('showing');
         const elapsed = Date.now() - startTs;
@@ -53,8 +87,8 @@ export default function AdModal({ onFinished, minViewMs = 3000, maxWaitMs = 1500
       };
 
       const handleError = () => {
-        console.log('Adsterra: Script failed, trying iframe method...');
-        setTimeout(() => tryIframeMethod(), 500);
+        console.log(`Adsterra: ${ad.name} script failed, trying next network...`);
+        setTimeout(() => tryAdNetwork(currentAdIndex.current + 1), 1000);
       };
 
       script.addEventListener('load', handleLoaded);
@@ -63,28 +97,24 @@ export default function AdModal({ onFinished, minViewMs = 3000, maxWaitMs = 1500
       container.innerHTML = '';
       container.appendChild(script);
 
-      // Timeout for script method
+      // Timeout for this method
       setTimeout(() => {
         if (!adLoadedRef.current && !finished) {
-          console.log('Adsterra: Script timeout, trying iframe...');
-          tryIframeMethod();
+          console.log(`Adsterra: ${ad.name} script timeout, trying next network...`);
+          tryAdNetwork(currentAdIndex.current + 1);
         }
-      }, 3000);
+      }, AD_SETTINGS.timeoutPerMethod);
     };
 
-    // Method 2: Try iframe method
-    const tryIframeMethod = () => {
-      console.log('Adsterra: Trying iframe method...');
-      setAdMethod('iframe');
-      
+    const tryIframeMethod = (ad: typeof AD_NETWORKS[0]) => {
       const iframe = document.createElement('iframe');
-      iframe.title = 'Adsterra Ad';
+      iframe.title = `${ad.name} Ad`;
       iframe.style.border = '0';
       iframe.style.width = '100%';
       iframe.style.height = '100%';
       iframe.style.background = '#000';
       iframe.referrerPolicy = 'no-referrer-when-downgrade';
-      iframe.sandbox = 'allow-scripts allow-same-origin allow-popups allow-forms';
+      iframe.sandbox = 'allow-scripts allow-same-origin allow-popups allow-forms allow-top-navigation';
       
       container.innerHTML = '';
       container.appendChild(iframe);
@@ -92,8 +122,8 @@ export default function AdModal({ onFinished, minViewMs = 3000, maxWaitMs = 1500
       try {
         const doc = iframe.contentDocument || iframe.contentWindow?.document;
         if (!doc) {
-          console.log('Adsterra: Cannot access iframe document');
-          setTimeout(() => tryFallbackMethod(), 1000);
+          console.log(`Adsterra: Cannot access iframe document for ${ad.name}`);
+          setTimeout(() => tryAdNetwork(currentAdIndex.current + 1), 1000);
           return;
         }
 
@@ -104,22 +134,24 @@ export default function AdModal({ onFinished, minViewMs = 3000, maxWaitMs = 1500
             <head>
               <meta charset="utf-8">
               <meta name="viewport" content="width=device-width, initial-scale=1">
-              <title>Adsterra Ad</title>
+              <title>${ad.name} Ad</title>
               <style>
                 body { margin: 0; padding: 0; background: #000; overflow: hidden; }
                 .ad-container { width: 100%; height: 100vh; display: flex; align-items: center; justify-content: center; }
+                .loading { color: white; font-family: Arial, sans-serif; }
               </style>
             </head>
             <body>
               <div class="ad-container">
-                <script type="text/javascript" src="https://pl27290084.profitableratecpm.com/d0/41/1a/d0411aa965c9eae2ef7ce1a2dc760583.js"></script>
+                <div class="loading">Loading ${ad.name} ad...</div>
+                <script type="text/javascript" src="${ad.script}"></script>
               </div>
             </body>
           </html>
         `);
         doc.close();
 
-        console.log('Adsterra: Iframe content loaded');
+        console.log(`Adsterra: ${ad.name} iframe content loaded`);
         adLoadedRef.current = true;
         setPhase('showing');
         const elapsed = Date.now() - startTs;
@@ -127,14 +159,14 @@ export default function AdModal({ onFinished, minViewMs = 3000, maxWaitMs = 1500
         setTimeout(() => finish(), wait);
 
       } catch (error) {
-        console.log('Adsterra: Iframe method failed:', error);
-        setTimeout(() => tryFallbackMethod(), 1000);
+        console.log(`Adsterra: ${ad.name} iframe method failed:`, error);
+        setTimeout(() => tryAdNetwork(currentAdIndex.current + 1), 1000);
       }
     };
 
-    // Method 3: Fallback method (show message)
-    const tryFallbackMethod = () => {
-      console.log('Adsterra: Using fallback method...');
+    const showFallbackAd = () => {
+      console.log('Adsterra: Showing fallback ad');
+      setCurrentAd('Fallback');
       setAdMethod('fallback');
       
       container.innerHTML = `
@@ -151,13 +183,23 @@ export default function AdModal({ onFinished, minViewMs = 3000, maxWaitMs = 1500
           text-align: center;
           padding: 20px;
         ">
-          <div style="font-size: 24px; margin-bottom: 20px;">🎯</div>
-          <h2 style="margin: 0 0 10px 0; font-size: 28px;">Ad Blocked</h2>
-          <p style="margin: 0 0 20px 0; font-size: 16px; opacity: 0.9;">
-            Please disable your ad blocker to support our content
+          <div style="font-size: 48px; margin-bottom: 20px;">🎯</div>
+          <h2 style="margin: 0 0 10px 0; font-size: 32px; font-weight: bold;">Advertisement</h2>
+          <p style="margin: 0 0 20px 0; font-size: 18px; opacity: 0.9;">
+            This space is reserved for advertisements
           </p>
-          <div style="font-size: 14px; opacity: 0.7;">
-            This ad helps us keep the service free
+          <div style="font-size: 14px; opacity: 0.7; margin-bottom: 30px;">
+            Ads help us keep this service free for everyone
+          </div>
+          <div style="
+            background: rgba(255,255,255,0.2);
+            padding: 15px 30px;
+            border-radius: 25px;
+            font-size: 16px;
+            font-weight: bold;
+            backdrop-filter: blur(10px);
+          ">
+            Thank you for your support! 🙏
           </div>
         </div>
       `;
@@ -168,8 +210,8 @@ export default function AdModal({ onFinished, minViewMs = 3000, maxWaitMs = 1500
       setTimeout(() => finish(), wait);
     };
 
-    // Start with script method
-    tryScriptMethod();
+    // Start trying ad networks
+    tryAdNetwork(0);
 
     // Hard timeout
     const hardTimeout = setTimeout(() => {
@@ -190,8 +232,10 @@ export default function AdModal({ onFinished, minViewMs = 3000, maxWaitMs = 1500
     mountedRef.current = true;
     ranRef.current = false;
     adLoadedRef.current = false;
+    currentAdIndex.current = 0;
     setPhase('loading');
-    setAdMethod('script');
+    setCurrentAd('');
+    setAdMethod('');
   }, []);
 
   return (
@@ -200,9 +244,12 @@ export default function AdModal({ onFinished, minViewMs = 3000, maxWaitMs = 1500
       {phase === 'loading' && (
         <div className="absolute inset-0 flex items-center justify-center">
           <div className="text-center">
-            <div className="h-12 w-12 animate-spin rounded-full border-4 border-white/30 border-t-white mx-auto mb-4" />
-            <p className="text-white/80 text-sm">
-              Loading ad... ({adMethod})
+            <div className="h-16 w-16 animate-spin rounded-full border-4 border-white/30 border-t-white mx-auto mb-4" />
+            <p className="text-white/80 text-lg font-semibold mb-2">
+              Loading Advertisement...
+            </p>
+            <p className="text-white/60 text-sm">
+              {currentAd && `${currentAd} (${adMethod})`}
             </p>
           </div>
         </div>
@@ -213,8 +260,11 @@ export default function AdModal({ onFinished, minViewMs = 3000, maxWaitMs = 1500
       
       {/* Debug info (only in development) */}
       {process.env.NODE_ENV === 'development' && (
-        <div className="absolute top-4 right-4 bg-black/50 text-white text-xs p-2 rounded">
-          Method: {adMethod} | Phase: {phase}
+        <div className="absolute top-4 right-4 bg-black/70 text-white text-xs p-3 rounded-lg">
+          <div><strong>Ad:</strong> {currentAd}</div>
+          <div><strong>Method:</strong> {adMethod}</div>
+          <div><strong>Phase:</strong> {phase}</div>
+          <div><strong>Index:</strong> {currentAdIndex.current}</div>
         </div>
       )}
     </div>
