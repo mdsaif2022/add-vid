@@ -34,22 +34,27 @@ export function useVideoAdCycle() {
       // Check if we've already played this video recently
       if (playedVideosRef.current.has(video.url)) {
         console.log('Video already played recently, fetching another...');
-        // Try to fetch a different video by adding a different cache-busting parameter
-        const res2 = await fetch(`/api/videos?t=${timestamp + 1000}`, { cache: 'no-store' });
-        if (res2.ok) {
-          const video2 = await res2.json();
-          console.log('Alternative video fetched:', video2.url);
-          // Mark this video as played too
-          playedVideosRef.current.add(video2.url);
-          return video2;
+        // Try multiple times to get a different video
+        for (let attempt = 1; attempt <= 3; attempt++) {
+          const res2 = await fetch(`/api/videos?t=${timestamp + attempt * 1000}`, { cache: 'no-store' });
+          if (res2.ok) {
+            const video2 = await res2.json();
+            if (!playedVideosRef.current.has(video2.url)) {
+              console.log(`Alternative video fetched on attempt ${attempt}:`, video2.url);
+              playedVideosRef.current.add(video2.url);
+              return video2;
+            }
+            console.log(`Attempt ${attempt}: Got duplicate video, trying again...`);
+          }
         }
+        console.log('All attempts returned duplicates, using original video');
       }
       
       // Mark this video as played
       playedVideosRef.current.add(video.url);
       
       // If we've played too many videos, reset the set to allow repetition
-      if (playedVideosRef.current.size > 5) {
+      if (playedVideosRef.current.size > 3) {
         playedVideosRef.current.clear();
         console.log('Cleared played videos set to allow repetition');
       }

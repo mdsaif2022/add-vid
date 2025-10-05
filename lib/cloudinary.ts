@@ -20,13 +20,15 @@ export async function getRandomVideo(): Promise<CloudinaryVideo | null> {
   const resources: any[] = res.resources || [];
   if (!resources.length) return null;
 
-  // Use timestamp-based randomization for better variety
-  const timestamp = Date.now();
-  const randomSeed = timestamp % resources.length;
+  // Use crypto.randomInt for true randomization (if available) or fallback to Math.random
+  let randomIndex: number;
+  if (typeof crypto !== 'undefined' && crypto.randomInt) {
+    randomIndex = crypto.randomInt(0, resources.length);
+  } else {
+    randomIndex = Math.floor(Math.random() * resources.length);
+  }
   
-  // Also shuffle the array for additional randomization
-  const shuffled = [...resources].sort(() => Math.random() - 0.5);
-  const chosen = shuffled[randomSeed] || shuffled[0];
+  const chosen = resources[randomIndex];
 
   const playback_url = cloudinary.url(chosen.public_id, {
     resource_type: chosen.resource_type,
@@ -34,7 +36,7 @@ export async function getRandomVideo(): Promise<CloudinaryVideo | null> {
     secure: true,
   });
 
-  console.log(`Selected video: ${chosen.public_id} (from ${resources.length} total resources)`);
+  console.log(`Selected video: ${chosen.public_id} (index: ${randomIndex} from ${resources.length} total resources)`);
 
   return {
     public_id: chosen.public_id,
