@@ -15,7 +15,15 @@ export async function GET(request: Request) {
     }
     
     console.log(`API: Returning video: ${video.public_id}`);
-    return NextResponse.json(video);
+    
+    // Add headers to prevent caching on Vercel
+    const response = NextResponse.json(video);
+    response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    response.headers.set('Pragma', 'no-cache');
+    response.headers.set('Expires', '0');
+    response.headers.set('Surrogate-Control', 'no-store');
+    
+    return response;
   } catch (error) {
     console.error('API: Error fetching video:', error);
     return NextResponse.json({ message: 'Failed to fetch videos' }, { status: 500 });

@@ -17,8 +17,17 @@ export function useVideoAdCycle() {
   const historyRef = useRef<string[]>([]);
   const suppressHistoryPushRef = useRef<boolean>(false);
   const playedVideosRef = useRef<Set<string>>(new Set());
+  const fetchingRef = useRef<boolean>(false);
 
   const fetchRandomVideo = useCallback(async (): Promise<Video | null> => {
+    // Prevent multiple simultaneous calls
+    if (fetchingRef.current) {
+      console.log('Already fetching video, skipping...');
+      return null;
+    }
+    
+    fetchingRef.current = true;
+    
     try {
       console.log('Fetching random video...');
       // Add timestamp to prevent caching
@@ -63,6 +72,8 @@ export function useVideoAdCycle() {
     } catch (error) {
       console.error('Video fetch error:', error);
       return null;
+    } finally {
+      fetchingRef.current = false;
     }
   }, []);
 
