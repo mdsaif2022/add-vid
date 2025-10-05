@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import VideoPlayer from '@/components/VideoPlayer';
 import AdModal from '@/components/AdModal';
 import Loader from '@/components/Loader';
+import ClientOnly from '@/components/ClientOnly';
 import { useVideoAdCycle } from '@/hooks/useVideoAdCycle';
 
 export default function HomePage() {
@@ -29,14 +30,20 @@ export default function HomePage() {
     <main className="min-h-screen w-full">
       {phase.type === 'loading' && <Loader />}
       {phase.type === 'video' && (
-        <VideoPlayer 
-          src={phase.src} 
-          onEnded={handleVideoEnd} 
-          onPrev={playPreviousVideo}
-          onNext={playNextVideo}
-        />
+        <ClientOnly fallback={<Loader />}>
+          <VideoPlayer 
+            src={phase.src} 
+            onEnded={handleVideoEnd} 
+            onPrev={playPreviousVideo}
+            onNext={playNextVideo}
+          />
+        </ClientOnly>
       )}
-      {phase.type === 'ad' && <AdModal onFinished={handleAdFinished} />}
+      {phase.type === 'ad' && (
+        <ClientOnly fallback={<Loader />}>
+          <AdModal onFinished={handleAdFinished} />
+        </ClientOnly>
+      )}
     </main>
   );
 }

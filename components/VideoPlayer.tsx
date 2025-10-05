@@ -22,7 +22,16 @@ export default function VideoPlayer({ src, onEnded, autoPlay = true, onPrev, onN
   const [scrubbing, setScrubbing] = useState<boolean>(false);
   const [showShare, setShowShare] = useState<boolean>(false);
 
-  const isMobile = useMemo(() => typeof window !== 'undefined' && window.matchMedia('(max-width: 768px)').matches, []);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.matchMedia('(max-width: 768px)').matches);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   const isImage = useMemo(() => {
     if (!src) return false;

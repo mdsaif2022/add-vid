@@ -26,6 +26,7 @@ export default function AdModal({
   const [phase, setPhase] = useState<'loading' | 'showing' | 'done'>('loading');
   const [currentAd, setCurrentAd] = useState<string>('');
   const [adMethod, setAdMethod] = useState<string>('');
+  const [isDev, setIsDev] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const ranRef = useRef(false);
   const mountedRef = useRef(true);
@@ -236,6 +237,7 @@ export default function AdModal({
     setPhase('loading');
     setCurrentAd('');
     setAdMethod('');
+    setIsDev(process.env.NODE_ENV === 'development');
   }, []);
 
   return (
@@ -259,7 +261,7 @@ export default function AdModal({
       <div ref={containerRef} className="h-screen w-screen" />
       
       {/* Debug info (only in development) */}
-      {process.env.NODE_ENV === 'development' && (
+      {isDev && (
         <div className="absolute top-4 right-4 bg-black/70 text-white text-xs p-3 rounded-lg">
           <div><strong>Ad:</strong> {currentAd}</div>
           <div><strong>Method:</strong> {adMethod}</div>
