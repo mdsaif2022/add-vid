@@ -21,7 +21,9 @@ export function useVideoAdCycle() {
   const fetchRandomVideo = useCallback(async (): Promise<Video | null> => {
     try {
       console.log('Fetching random video...');
-      const res = await fetch('/api/videos', { cache: 'no-store' });
+      // Add timestamp to prevent caching
+      const timestamp = Date.now();
+      const res = await fetch(`/api/videos?t=${timestamp}`, { cache: 'no-store' });
       if (!res.ok) {
         console.error('Video fetch failed:', res.status, res.statusText);
         return null;
@@ -32,11 +34,13 @@ export function useVideoAdCycle() {
       // Check if we've already played this video recently
       if (playedVideosRef.current.has(video.url)) {
         console.log('Video already played recently, fetching another...');
-        // Try to fetch a different video by adding a cache-busting parameter
-        const res2 = await fetch(`/api/videos?t=${Date.now()}`, { cache: 'no-store' });
+        // Try to fetch a different video by adding a different cache-busting parameter
+        const res2 = await fetch(`/api/videos?t=${timestamp + 1000}`, { cache: 'no-store' });
         if (res2.ok) {
           const video2 = await res2.json();
           console.log('Alternative video fetched:', video2.url);
+          // Mark this video as played too
+          playedVideosRef.current.add(video2.url);
           return video2;
         }
       }
@@ -45,7 +49,7 @@ export function useVideoAdCycle() {
       playedVideosRef.current.add(video.url);
       
       // If we've played too many videos, reset the set to allow repetition
-      if (playedVideosRef.current.size > 10) {
+      if (playedVideosRef.current.size > 5) {
         playedVideosRef.current.clear();
         console.log('Cleared played videos set to allow repetition');
       }
